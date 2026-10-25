@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, X, Check, Plus, AlertCircle } from 'lucide-react';
+import { MapPin, Navigation, X, Check, Plus, AlertCircle, Search, Compass } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { Address } from '../types';
@@ -10,25 +10,41 @@ interface LocationModalProps {
   onClose: () => void;
 }
 
+const POPULAR_AP_REGIONS = [
+  { name: 'Vijayawada (Krishna)', village: 'Vijayawada Urban', district: 'Krishna', state: 'Andhra Pradesh', pincode: '520001', lat: 16.506, lng: 80.648 },
+  { name: 'Guntur Rural', village: 'Guntur Rural', district: 'Guntur', state: 'Andhra Pradesh', pincode: '522002', lat: 16.306, lng: 80.436 },
+  { name: 'Visakhapatnam', village: 'Visakhapatnam Coastal', district: 'Visakhapatnam', state: 'Andhra Pradesh', pincode: '530001', lat: 17.686, lng: 83.218 },
+  { name: 'Tirupati Mandi', village: 'Tirupati Town', district: 'Tirupati', state: 'Andhra Pradesh', pincode: '517501', lat: 13.628, lng: 79.419 },
+  { name: 'Kurnool Hub', village: 'Kurnool Town', district: 'Kurnool', state: 'Andhra Pradesh', pincode: '518001', lat: 15.828, lng: 78.037 },
+  { name: 'Rajahmundry', village: 'Rajahmundry Urban', district: 'East Godavari', state: 'Andhra Pradesh', pincode: '533101', lat: 17.000, lng: 81.804 },
+  { name: 'Kakinada Agro', village: 'Kakinada Town', district: 'Kakinada', state: 'Andhra Pradesh', pincode: '533001', lat: 16.989, lng: 82.247 },
+  { name: 'Nellore Mandi', village: 'Nellore Rural', district: 'Nellore', state: 'Andhra Pradesh', pincode: '524001', lat: 14.442, lng: 79.986 }
+];
+
 export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose }) => {
   const { user, selectedAddress, setSelectedAddress } = useAuth();
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [isLocating, setIsLocating] = useState<boolean>(false);
   const [locationError, setLocationError] = useState<string | null>(null);
 
-  // New address form state
+  // New address form state (defaults to Andhra Pradesh)
   const [isAddingNew, setIsAddingNew] = useState<boolean>(false);
   const [label, setLabel] = useState<string>('Home');
   const [recipientName, setRecipientName] = useState<string>(user?.full_name || '');
   const [mobile, setMobile] = useState<string>(user?.mobile || '');
   const [addressLine, setAddressLine] = useState<string>('');
-  const [villageTown, setVillageTown] = useState<string>('Shadnagar Rural');
-  const [district, setDistrict] = useState<string>('Rangareddy');
-  const [state, setState] = useState<string>('Telangana');
-  const [pincode, setPincode] = useState<string>('509216');
-  const [lat, setLat] = useState<number>(17.067);
-  const [lng, setLng] = useState<number>(78.204);
+  const [villageTown, setVillageTown] = useState<string>('Vijayawada Urban');
+  const [district, setDistrict] = useState<string>('Krishna');
+  const [state, setState] = useState<string>('Andhra Pradesh');
+  const [pincode, setPincode] = useState<string>('520001');
+  const [lat, setLat] = useState<number>(16.506);
+  const [lng, setLng] = useState<number>(80.648);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+
+  // Location search query & results
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState<boolean>(false);
 
   useEffect(() => {
     if (isOpen && user?.role === 'customer') {
@@ -50,7 +66,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
     setLocationError(null);
 
     if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by your browser. Please enter your address manually.');
+      setLocationError('GPS geolocation not supported by browser. Please search your town/village below.');
       setIsLocating(false);
       setIsAddingNew(true);
       return;
@@ -82,19 +98,61 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
         setIsLocating(false);
         setIsAddingNew(true);
         if (error.code === error.PERMISSION_DENIED) {
-          setLocationError('Location permission denied. No problem! Please enter your village/town address below.');
+          setLocationError('Location permission denied. You can search or select your Andhra Pradesh town below.');
         } else {
-          setLocationError('Could not retrieve GPS location. Please enter your address details below.');
+          setLocationError('GPS detection was not exact. Please pick your district or search below.');
         }
       },
-      { timeout: 10000, enableHighAccuracy: true }
+      { timeout: 8000, enableHighAccuracy: true, maximumAge: 0 }
     );
+  };
+
+  const handleSearchLocation = async (q: string) => {
+    setSearchQuery(q);
+    if (q.trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      setIsSearching(true);
+      const results = await api.searchLocations(q);
+      setSearchResults(results);
+    } catch (err) {
+      console.error('Failed to search location', err);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSelectSearchResult = (loc: any) => {
+    setLat(loc.lat);
+    setLng(loc.lng);
+    setVillageTown(loc.village_town);
+    setDistrict(loc.district);
+    setState(loc.state);
+    setPincode(loc.pincode || '520001');
+    setAddressLine(loc.name);
+    setSearchResults([]);
+    setSearchQuery('');
+    setIsAddingNew(true);
+  };
+
+  const handleSelectQuickRegion = (r: typeof POPULAR_AP_REGIONS[0]) => {
+    setLat(r.lat);
+    setLng(r.lng);
+    setVillageTown(r.village);
+    setDistrict(r.district);
+    setState(r.state);
+    setPincode(r.pincode);
+    setAddressLine(`${r.village}, ${r.district}, ${r.state}`);
+    setIsAddingNew(true);
   };
 
   const handleSaveAddress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!addressLine || !villageTown || !district) {
-      alert('Please fill in village/town, district, and address.');
+      alert('Please fill in village/town, district, and address details.');
       return;
     }
 
@@ -108,7 +166,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
         village_town: villageTown,
         district,
         state,
-        pincode: pincode || '500001',
+        pincode: pincode || '520001',
         latitude: lat,
         longitude: lng,
         is_default: true,
@@ -129,16 +187,16 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-emerald-100 flex flex-col">
+      <div className="bg-white rounded-3xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-emerald-100 flex flex-col">
         {/* Header */}
         <div className="sticky top-0 bg-emerald-50 px-6 py-4 border-b border-emerald-100 flex items-center justify-between z-20">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-emerald-600 text-white rounded-lg">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-sm">
               <MapPin className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-emerald-950">Delivery Location</h2>
-              <p className="text-xs text-emerald-700">Select where you want your fresh farm harvest delivered</p>
+              <p className="text-xs text-emerald-700">Accurate delivery point across Andhra Pradesh & India</p>
             </div>
           </div>
           <button
@@ -154,10 +212,10 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
           <button
             onClick={handleGetCurrentLocation}
             disabled={isLocating}
-            className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl flex items-center justify-center gap-2 shadow-sm transition active:scale-[0.98] disabled:opacity-50"
+            className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl flex items-center justify-center gap-2 shadow-sm transition active:scale-[0.98] disabled:opacity-50"
           >
             <Navigation className={`w-5 h-5 ${isLocating ? 'animate-spin' : ''}`} />
-            {isLocating ? 'Detecting your GPS location...' : 'Use My Current Location'}
+            {isLocating ? 'Acquiring High-Precision GPS...' : 'Use My Current Location'}
           </button>
 
           {locationError && (
@@ -167,9 +225,62 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
             </div>
           )}
 
+          {/* Quick Location Search Bar */}
+          <div className="space-y-1 relative">
+            <label className="text-xs font-bold text-stone-700 flex items-center gap-1">
+              <Search className="w-3.5 h-3.5 text-stone-400" /> Search Andhra Pradesh Village or City:
+            </label>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => handleSearchLocation(e.target.value)}
+              placeholder="e.g. Vijayawada, Guntur, Tirupati, Vizag..."
+              className="w-full px-3.5 py-2 text-xs sm:text-sm border border-stone-300 rounded-xl focus:ring-2 focus:ring-emerald-500"
+            />
+            {isSearching && (
+              <span className="text-[11px] text-stone-400 block pt-1">Searching OpenStreetMap...</span>
+            )}
+            {searchResults.length > 0 && (
+              <div className="absolute top-full left-0 right-0 bg-white border border-stone-200 rounded-xl shadow-xl mt-1 z-30 max-h-48 overflow-y-auto divide-y divide-stone-100">
+                {searchResults.map((r, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSelectSearchResult(r)}
+                    className="w-full text-left p-2.5 text-xs hover:bg-emerald-50 text-stone-800 flex items-center justify-between"
+                  >
+                    <span className="truncate max-w-[80%] font-medium">{r.name}</span>
+                    <span className="text-[10px] text-emerald-700 font-bold bg-emerald-100 px-1.5 py-0.5 rounded">
+                      {r.district}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Quick AP Region Pills */}
+          <div className="space-y-1.5">
+            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider flex items-center gap-1">
+              <Compass className="w-3.5 h-3.5 text-emerald-600" /> Popular Andhra Pradesh Hubs:
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {POPULAR_AP_REGIONS.map((r, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => handleSelectQuickRegion(r)}
+                  className="px-2.5 py-1 text-xs rounded-lg border border-stone-200 bg-stone-50 hover:bg-emerald-100 hover:border-emerald-300 text-stone-700 hover:text-emerald-900 transition font-medium"
+                >
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Saved Addresses List */}
           {!isAddingNew && addresses.length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-3 pt-2 border-t border-stone-100">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-stone-500">Saved Addresses</span>
                 <button
@@ -225,7 +336,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
           {isAddingNew && (
             <form onSubmit={handleSaveAddress} className="space-y-4 pt-2 border-t border-stone-100">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-stone-900">Enter Delivery Details</h3>
+                <h3 className="text-sm font-bold text-stone-900">Pinpoint Delivery Details</h3>
                 {addresses.length > 0 && (
                   <button
                     type="button"
@@ -239,16 +350,28 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
 
               {/* Interactive OpenStreetMap */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-stone-700">Pinpoint Delivery Point on Map:</label>
+                <label className="text-xs font-semibold text-stone-700">Drag Marker or Tap to Pinpoint Exact Location:</label>
                 <InteractiveMap
                   latitude={lat}
                   longitude={lng}
-                  onLocationSelect={(newLat, newLng) => {
+                  onLocationSelect={async (newLat, newLng) => {
                     setLat(newLat);
                     setLng(newLng);
+                    try {
+                      const geo = await api.reverseGeocode(newLat, newLng);
+                      setVillageTown(geo.village_town);
+                      setDistrict(geo.district);
+                      setState(geo.state);
+                      setPincode(geo.pincode);
+                      setAddressLine(geo.formatted_address);
+                    } catch (err) {
+                      console.error(err);
+                    }
                   }}
                 />
-                <p className="text-[11px] text-stone-500">Tap or drag the pin to set delivery gate/farm entrance.</p>
+                <p className="text-[11px] text-stone-500">
+                  Current Coords: {lat.toFixed(4)}, {lng.toFixed(4)}
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -260,7 +383,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
                     value={villageTown}
                     onChange={(e) => setVillageTown(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    placeholder="e.g. Shadnagar Rural"
+                    placeholder="e.g. Vijayawada Urban"
                   />
                 </div>
                 <div>
@@ -271,7 +394,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
                     value={district}
                     onChange={(e) => setDistrict(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    placeholder="e.g. Rangareddy"
+                    placeholder="e.g. Krishna"
                   />
                 </div>
               </div>
@@ -285,7 +408,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
                     value={state}
                     onChange={(e) => setState(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    placeholder="e.g. Telangana"
+                    placeholder="Andhra Pradesh"
                   />
                 </div>
                 <div>
@@ -296,7 +419,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
                     value={pincode}
                     onChange={(e) => setPincode(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    placeholder="e.g. 509216"
+                    placeholder="e.g. 520001"
                   />
                 </div>
               </div>
@@ -309,7 +432,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
                   value={addressLine}
                   onChange={(e) => setAddressLine(e.target.value)}
                   className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                  placeholder="Plot number, farm lane, near water tank..."
+                  placeholder="Plot number, farm lane, near canal or temple..."
                 />
               </div>
 
@@ -321,7 +444,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
                     value={recipientName}
                     onChange={(e) => setRecipientName(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    placeholder="Ananya Sharma"
+                    placeholder="Your name"
                   />
                 </div>
                 <div>
@@ -331,7 +454,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
                     value={mobile}
                     onChange={(e) => setMobile(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-stone-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-                    placeholder="9876543210"
+                    placeholder="Mobile number"
                   />
                 </div>
               </div>
@@ -339,7 +462,7 @@ export const LocationModal: React.FC<LocationModalProps> = ({ isOpen, onClose })
               <button
                 type="submit"
                 disabled={isSaving}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition shadow"
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition shadow"
               >
                 {isSaving ? 'Saving Address...' : 'Confirm Delivery Location'}
               </button>

@@ -119,6 +119,12 @@ def checkout_cart(
                 status_code=400,
                 detail=f"Item '{prod.name if prod else 'Unknown'}' is no longer active in marketplace."
             )
+        min_qty = getattr(prod, "min_order_quantity", 10.0) or 10.0
+        if ci.quantity < min_qty and prod.unit_type.lower() in ["kg", "kgs", "kilogram"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Minimum order for '{prod.name}' is {min_qty} {prod.unit_type}. You have {ci.quantity} {prod.unit_type} in your cart."
+            )
         if prod.stock_quantity < ci.quantity:
             raise HTTPException(
                 status_code=400,

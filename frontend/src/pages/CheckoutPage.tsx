@@ -199,10 +199,30 @@ export const CheckoutPage: React.FC<CheckoutPageProps> = ({ onBackToShopping, on
             <span className="text-xl font-extrabold text-emerald-800">₹{cart.subtotal.toFixed(2)}</span>
           </div>
 
-          <div className="flex justify-end">
+          {/* 10 kg Minimum Order Alert */}
+          {cart.items.some(ci => ci.quantity < (ci.product.min_order_quantity || 10) && ['kg', 'kgs', 'kilogram'].includes(ci.product.unit_type?.toLowerCase() || '')) && (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3 text-amber-800 text-xs">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold text-sm text-amber-900">Minimum Order Requirement (10 kg)</p>
+                <p className="mt-0.5">
+                  Produce from farmers requires a minimum order of 10 kg per item to ensure bulk farm-direct transport. Please adjust items in your cart to at least 10 kg.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center">
+            <button
+              onClick={onBackToShopping}
+              className="py-3 px-6 text-stone-600 hover:text-stone-900 text-sm font-semibold flex items-center gap-1.5"
+            >
+              <ArrowLeft className="w-4 h-4" /> Edit Cart
+            </button>
             <button
               onClick={() => setCurrentStep(2)}
-              className="py-3.5 px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow transition flex items-center gap-2"
+              disabled={cart.items.some(ci => ci.quantity < (ci.product.min_order_quantity || 10) && ['kg', 'kgs', 'kilogram'].includes(ci.product.unit_type?.toLowerCase() || ''))}
+              className="py-3.5 px-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Continue to Delivery Address <ArrowRight className="w-4 h-4" />
             </button>

@@ -29,6 +29,7 @@ def format_product_response(p: Product) -> dict:
         "image_url": p.image_url,
         "price_per_unit": p.price_per_unit,
         "unit_type": p.unit_type,
+        "min_order_quantity": getattr(p, "min_order_quantity", 10.0) or 10.0,
         "stock_quantity": p.stock_quantity,
         "farm_location": p.farm_location,
         "harvest_date": p.harvest_date,
@@ -139,6 +140,7 @@ def create_product(
         image_url=data.image_url or "https://images.unsplash.com/photo-1540420773420-3366772f4999?w=500&auto=format&fit=crop&q=80",
         price_per_unit=data.price_per_unit,
         unit_type=data.unit_type,
+        min_order_quantity=data.min_order_quantity if data.min_order_quantity >= 10.0 or data.unit_type not in ["kg", "kgs"] else 10.0,
         stock_quantity=data.stock_quantity,
         farm_location=farm_loc or "Organic Farm, India",
         harvest_date=data.harvest_date or "Fresh Today",
@@ -182,6 +184,8 @@ def update_product(
         prod.price_per_unit = data.price_per_unit
     if data.unit_type is not None:
         prod.unit_type = data.unit_type
+    if data.min_order_quantity is not None:
+        prod.min_order_quantity = data.min_order_quantity
     if data.stock_quantity is not None:
         prod.stock_quantity = data.stock_quantity
     if data.farm_location is not None:

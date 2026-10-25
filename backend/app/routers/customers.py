@@ -1,7 +1,8 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
+import httpx
 
 from app.database import get_db
 from app.models import User, Address, CustomerProfile
@@ -18,6 +19,8 @@ class GeolocationLookupRequest(BaseModel):
 
 class CustomerProfileUpdate(BaseModel):
     full_name: Optional[str] = None
+    mobile: Optional[str] = None
+    email: Optional[str] = None
     preferred_delivery_slot: Optional[str] = None
     default_address: Optional[str] = None
     village_town: Optional[str] = None
@@ -125,40 +128,87 @@ def set_default_address(
 
 
 @router.post("/location/reverse-geocode")
-def simulate_reverse_geocode(data: GeolocationLookupRequest):
+def reverse_geocode(data: GeolocationLookupRequest):
     """
-    Translates GPS coordinates into farmer-friendly village/district/state details.
-    Provides reliable, zero-API-key fallback representation for Indian agricultural hubs.
+    Translates GPS coordinates into accurate village/district/state details.
+    Queries OpenStreetMap Nominatim with dependable fallback for Andhra Pradesh and India.
     """
     lat, lng = data.latitude, data.longitude
 
-    # Intelligent lookup based on latitude/longitude ranges in India
-    # Approx ranges:
-    if 16.5 <= lat <= 18.5 and 77.5 <= lng <= 79.5:
-        village = "Shadnagar Rural"
+    # 1. Real OpenStreetMap Nominatim reverse geocoding
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?lat={lat}&lon={lng}&format=json&addressdetails=1"
+        headers = {
+            "User-Agent": "Farm2Home-Agricultural-Marketplace/1.0 (support@farm2home.org)"
+        }
+        with httpx.Client(timeout=4.0) as client:
+            resp = client.get(url, headers=headers)
+            if resp.status_code == 200:
+                geo = resp.json()
+                addr = geo.get("address", {})
+                village_town = (
+                    addr.get("village")
+                    or addr.get("suburb")
+                    or addr.get("town")
+                    or addr.get("city_district")
+                    or addr.get("city")
+                    or addr.get("county")
+                    or "Local Village"
+                )
+                district = (
+                    addr.get("state_district")
+                    or addr.get("county")
+                    or addr.get("district")
+                    or addr.get("city")
+                    or "District"
+                )
+                state = addr.get("state") or "Andhra Pradesh"
+                pincode = addr.get("postcode") or ""
+                formatted = geo.get("display_name", f"{village_town}, {district}, {state}")
+
+                return {
+                    "latitude": lat,
+                    "longitude": lng,
+                    "village_town": village_town,
+                    "district": district,
+                    "state": state,
+                    "pincode": pincode,
+                    "formatted_address": formatted
+                }
+    except Exception as e:
+        print(f"Nominatim lookup notice: {e}")
+
+    # Accurate Fallback for Andhra Pradesh and surrounding regions:
+    if 16.0 <= lat <= 17.0 and 80.0 <= lng <= 81.5:
+        village = "Vijayawada / Guntur Region"
+        district = "Krishna"
+        state = "Andhra Pradesh"
+        pincode = "520001"
+    elif 17.0 <= lat <= 18.5 and 82.5 <= lng <= 84.0:
+        village = "Visakhapatnam Area"
+        district = "Visakhapatnam"
+        state = "Andhra Pradesh"
+        pincode = "530001"
+    elif 13.0 <= lat <= 14.2 and 79.0 <= lng <= 80.0:
+        village = "Tirupati Mandi Area"
+        district = "Tirupati"
+        state = "Andhra Pradesh"
+        pincode = "517501"
+    elif 15.0 <= lat <= 16.5 and 77.5 <= lng <= 79.0:
+        village = "Kurnool Agro Hub"
+        district = "Kurnool"
+        state = "Andhra Pradesh"
+        pincode = "518001"
+    elif 16.5 <= lat <= 18.5 and 77.5 <= lng <= 79.5:
+        village = "Shadnagar / Hyderabad Rural"
         district = "Rangareddy"
         state = "Telangana"
         pincode = "509216"
-    elif 12.0 <= lat <= 14.0 and 76.5 <= lng <= 78.5:
-        village = "Devanahalli Mandi"
-        district = "Bengaluru Rural"
-        state = "Karnataka"
-        pincode = "562110"
-    elif 18.0 <= lat <= 20.0 and 73.0 <= lng <= 75.0:
-        village = "Baramati Agro Area"
-        district = "Pune"
-        state = "Maharashtra"
-        pincode = "413102"
-    elif 28.0 <= lat <= 30.5 and 76.0 <= lng <= 78.0:
-        village = "Murthal Green Zone"
-        district = "Sonipat"
-        state = "Haryana"
-        pincode = "131027"
     else:
-        village = f"Green Valley Area (Lat: {lat:.3f}, Lng: {lng:.3f})"
-        district = "Agrarian District"
-        state = "Kisan Pradesh"
-        pincode = "500001"
+        village = f"Farm Area ({lat:.3f}, {lng:.3f})"
+        district = "Andhra Pradesh District"
+        state = "Andhra Pradesh"
+        pincode = "520001"
 
     return {
         "latitude": lat,
@@ -171,14 +221,64 @@ def simulate_reverse_geocode(data: GeolocationLookupRequest):
     }
 
 
+@router.get("/location/search")
+def search_location(query: str = Query(..., min_length=2)):
+    """Search Indian locations using OpenStreetMap Nominatim with fallback."""
+    try:
+        url = f"https://nominatim.openstreetmap.org/search?q={query}&format=json&countrycodes=in&addressdetails=1&limit=5"
+        headers = {
+            "User-Agent": "Farm2Home-Agricultural-Marketplace/1.0 (support@farm2home.org)"
+        }
+        with httpx.Client(timeout=4.0) as client:
+            resp = client.get(url, headers=headers)
+            if resp.status_code == 200:
+                results = resp.json()
+                formatted_list = []
+                for r in results:
+                    addr = r.get("address", {})
+                    formatted_list.append({
+                        "name": r.get("display_name"),
+                        "lat": float(r.get("lat")),
+                        "lng": float(r.get("lon")),
+                        "village_town": addr.get("village") or addr.get("suburb") or addr.get("town") or addr.get("city") or query,
+                        "district": addr.get("state_district") or addr.get("county") or addr.get("city") or "Andhra Pradesh",
+                        "state": addr.get("state") or "Andhra Pradesh",
+                        "pincode": addr.get("postcode") or ""
+                    })
+                if formatted_list:
+                    return formatted_list
+    except Exception as e:
+        print(f"Search lookup notice: {e}")
+
+    # Fallback search for common AP towns/cities
+    ap_towns = [
+        {"name": "Vijayawada, Krishna, Andhra Pradesh", "lat": 16.506, "lng": 80.648, "village_town": "Vijayawada", "district": "Krishna", "state": "Andhra Pradesh", "pincode": "520001"},
+        {"name": "Guntur, Andhra Pradesh", "lat": 16.306, "lng": 80.436, "village_town": "Guntur", "district": "Guntur", "state": "Andhra Pradesh", "pincode": "522002"},
+        {"name": "Visakhapatnam, Andhra Pradesh", "lat": 17.686, "lng": 83.218, "village_town": "Visakhapatnam", "district": "Visakhapatnam", "state": "Andhra Pradesh", "pincode": "530001"},
+        {"name": "Tirupati, Andhra Pradesh", "lat": 13.628, "lng": 79.419, "village_town": "Tirupati", "district": "Tirupati", "state": "Andhra Pradesh", "pincode": "517501"},
+        {"name": "Kurnool, Andhra Pradesh", "lat": 15.828, "lng": 78.037, "village_town": "Kurnool", "district": "Kurnool", "state": "Andhra Pradesh", "pincode": "518001"},
+        {"name": "Rajahmundry, East Godavari, Andhra Pradesh", "lat": 17.000, "lng": 81.804, "village_town": "Rajahmundry", "district": "East Godavari", "state": "Andhra Pradesh", "pincode": "533101"},
+        {"name": "Kakinada, Andhra Pradesh", "lat": 16.989, "lng": 82.247, "village_town": "Kakinada", "district": "Kakinada", "state": "Andhra Pradesh", "pincode": "533001"},
+        {"name": "Nellore, Andhra Pradesh", "lat": 14.442, "lng": 79.986, "village_town": "Nellore", "district": "Nellore", "state": "Andhra Pradesh", "pincode": "524001"},
+        {"name": "Kadapa, Andhra Pradesh", "lat": 14.467, "lng": 78.824, "village_town": "Kadapa", "district": "YSR Kadapa", "state": "Andhra Pradesh", "pincode": "516001"},
+        {"name": "Anantapur, Andhra Pradesh", "lat": 14.681, "lng": 77.600, "village_town": "Anantapur", "district": "Anantapur", "state": "Andhra Pradesh", "pincode": "515001"}
+    ]
+    q = query.lower()
+    return [t for t in ap_towns if q in t["name"].lower() or q in t["village_town"].lower()] or ap_towns[:3]
+
+
 @router.put("/profile")
 def update_profile(
     data: CustomerProfileUpdate,
-    current_user: User = Depends(require_role(["customer", "management"])),
+    current_user: User = Depends(require_role(["customer", "merchant", "management"])),
     db: Session = Depends(get_db)
 ):
     if data.full_name:
         current_user.full_name = data.full_name.strip()
+    if data.mobile:
+        current_user.mobile = data.mobile.strip()
+    if data.email:
+        current_user.email = data.email.strip()
 
     profile = current_user.customer_profile
     if not profile:
@@ -197,4 +297,24 @@ def update_profile(
         profile.state = data.state
 
     db.commit()
-    return {"success": True, "message": "Profile updated successfully."}
+    db.refresh(current_user)
+    return {
+        "success": True,
+        "message": "Profile updated successfully.",
+        "user": {
+            "id": current_user.id,
+            "full_name": current_user.full_name,
+            "email": current_user.email,
+            "mobile": current_user.mobile,
+            "role": current_user.role,
+            "is_active": current_user.is_active,
+            "is_verified": current_user.is_verified,
+            "customer_profile": {
+                "village_town": profile.village_town,
+                "district": profile.district,
+                "state": profile.state,
+                "default_address": profile.default_address,
+                "preferred_delivery_slot": profile.preferred_delivery_slot
+            } if profile else None
+        }
+    }

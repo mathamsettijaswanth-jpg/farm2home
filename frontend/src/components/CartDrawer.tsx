@@ -119,7 +119,10 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
                     <p className="text-xs text-stone-500">
                       ₹{ci.product?.price_per_unit} / {ci.product?.unit_type}
                     </p>
-                    <p className="text-xs font-bold text-emerald-800 mt-0.5">
+                    <span className="inline-block mt-0.5 text-[10px] font-bold text-amber-800 bg-amber-100/70 px-1.5 py-0.5 rounded">
+                      Min: {ci.product?.min_order_quantity || 10} {ci.product?.unit_type}
+                    </span>
+                    <p className="text-xs font-bold text-emerald-800 mt-1">
                       ₹{ci.line_total.toFixed(2)}
                     </p>
                   </div>
@@ -136,8 +139,18 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({ onCheckout }) => {
 
                     <div className="flex items-center border border-stone-300 rounded-lg bg-white p-0.5">
                       <button
-                        onClick={() => updateQuantity(ci.id, ci.quantity - 1)}
+                        onClick={() => {
+                          const minQ = ci.product?.min_order_quantity || 10;
+                          if (ci.quantity <= minQ) {
+                            if (confirm(`Minimum order is ${minQ} ${ci.product?.unit_type}. Remove from cart?`)) {
+                              removeItem(ci.id);
+                            }
+                          } else {
+                            updateQuantity(ci.id, ci.quantity - 1);
+                          }
+                        }}
                         className="w-6 h-6 flex items-center justify-center rounded hover:bg-stone-100 text-stone-600"
+                        title={`Minimum order is ${ci.product?.min_order_quantity || 10} ${ci.product?.unit_type}`}
                       >
                         <Minus className="w-3 h-3" />
                       </button>

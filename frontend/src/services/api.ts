@@ -1,6 +1,7 @@
 import {
   User, Address, Category, Product, CartSummary,
-  Order, DemoPayment, AdminStats, DeliverySettings
+  Order, DemoPayment, AdminStats, DeliverySettings,
+  MarketPriceResponse, MarketPriceItem
 } from '../types';
 
 const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
@@ -118,12 +119,23 @@ export const api = {
   }) => apiRequest<DemoPayment>('/payments/simulate', 'POST', data),
   getOrderPayment: (order_id: number) => apiRequest<DemoPayment>(`/payments/order/${order_id}`),
 
+  // Market Prices (Daily AP Mandi Rates)
+  getMarketPrices: () => apiRequest<MarketPriceResponse>('/market-prices/today'),
+  searchMarketPrices: (query: string) =>
+    apiRequest<{ query: string; state: string; date: string; count: number; results: MarketPriceItem[] }>(
+      `/market-prices/search?query=${encodeURIComponent(query)}`
+    ),
+
   // Customers & Addresses
   getAddresses: () => apiRequest<Address[]>('/customers/addresses'),
   addAddress: (data: any) => apiRequest<Address>('/customers/addresses', 'POST', data),
   updateAddress: (id: number, data: any) => apiRequest<Address>(`/customers/addresses/${id}`, 'PUT', data),
   deleteAddress: (id: number) => apiRequest<{ success: boolean }>(`/customers/addresses/${id}`, 'DELETE'),
   setDefaultAddress: (id: number) => apiRequest<{ success: boolean }>(`/customers/addresses/${id}/default`, 'POST'),
+  updateCustomerProfile: (data: any) =>
+    apiRequest<{ success: boolean; message: string; user?: any }>('/customers/profile', 'PUT', data),
+  searchLocations: (query: string) =>
+    apiRequest<any[]>(`/customers/location/search?query=${encodeURIComponent(query)}`),
   reverseGeocode: (latitude: number, longitude: number) =>
     apiRequest<{
       latitude: number;

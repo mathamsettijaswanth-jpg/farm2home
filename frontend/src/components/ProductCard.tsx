@@ -12,12 +12,13 @@ interface ProductCardProps {
 export const ProductCard: React.FC<ProductCardProps> = ({ product, onLoginPrompt }) => {
   const { user } = useAuth();
   const { addToCart, isLoading } = useCart();
-  const [selectedQty, setSelectedQty] = useState<number>(1);
+  const minQty = product.min_order_quantity || 10;
+  const [selectedQty, setSelectedQty] = useState<number>(minQty);
   const [isAdding, setIsAdding] = useState<boolean>(false);
   const [justAdded, setJustAdded] = useState<boolean>(false);
 
   const isOutOfStock = product.stock_quantity <= 0;
-  const isLowStock = product.stock_quantity > 0 && product.stock_quantity <= 10;
+  const isLowStock = product.stock_quantity > 0 && product.stock_quantity <= minQty * 2;
 
   // Decimal safe calculation
   const itemTotal = (selectedQty * product.price_per_unit).toFixed(2);
@@ -29,7 +30,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onLoginPrompt
   };
 
   const handleDecrement = () => {
-    if (selectedQty > 1) {
+    if (selectedQty > minQty) {
       setSelectedQty(prev => prev - 1);
     }
   };
@@ -115,14 +116,25 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onLoginPrompt
 
         {/* Price & Quantity Selector */}
         <div className="pt-3 border-t border-stone-100 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="inline-flex items-center text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+              Min Order: {minQty} {product.unit_type}
+            </span>
+            {selectedQty > minQty && (
+              <span className="text-xs font-semibold text-stone-500">
+                Total: <strong className="text-emerald-700">₹{itemTotal}</strong>
+              </span>
+            )}
+          </div>
+
           <div className="flex items-baseline justify-between">
             <div>
               <span className="text-2xl font-extrabold text-stone-900">₹{product.price_per_unit}</span>
               <span className="text-xs text-stone-500 font-medium ml-1">/ {product.unit_type}</span>
             </div>
-            {selectedQty > 1 && (
+            {selectedQty === minQty && (
               <span className="text-xs font-semibold text-stone-500">
-                Total: <strong className="text-emerald-700">₹{itemTotal}</strong>
+                Min Total: <strong className="text-emerald-700">₹{itemTotal}</strong>
               </span>
             )}
           </div>
@@ -134,9 +146,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({ product, onLoginPrompt
                 <button
                   type="button"
                   onClick={handleDecrement}
-                  disabled={selectedQty <= 1}
+                  disabled={selectedQty <= minQty}
                   className="w-8 h-8 rounded-lg bg-white text-stone-700 flex items-center justify-center font-bold hover:bg-emerald-100 disabled:opacity-40 transition shadow-sm"
                   aria-label="Decrease quantity"
+                  title={`Minimum order is ${minQty} ${product.unit_type}`}
                 >
                   <Minus className="w-4 h-4" />
                 </button>

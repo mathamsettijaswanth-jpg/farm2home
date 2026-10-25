@@ -70,6 +70,7 @@ export interface Product {
   image_url: string;
   price_per_unit: number;
   unit_type: string; // kg, 500 g, bunch, piece, litre, bag
+  min_order_quantity: number; // minimum quantity required (e.g. 10 kg)
   stock_quantity: number;
   farm_location: string;
   harvest_date?: string;
@@ -127,6 +128,27 @@ export interface Order {
   items: OrderItem[];
   payment_status?: string;
   payment_method?: string;
+}
+
+export interface MarketPriceItem {
+  name: string;
+  wholesale_price: number;
+  retail_price_range: string;
+  unit: string;
+  image_url?: string;
+  category?: string;
+  state: string;
+  source?: string;
+}
+
+export interface MarketPriceResponse {
+  state: string;
+  market: string;
+  date: string;
+  source_url: string;
+  total_items: number;
+  items: MarketPriceItem[];
+  cached?: boolean;
 }
 
 export interface DemoPayment {

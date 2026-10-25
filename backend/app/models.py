@@ -110,6 +110,7 @@ class Product(Base):
     image_url = Column(Text, nullable=True)
     price_per_unit = Column(Float, nullable=False)
     unit_type = Column(String(50), nullable=False)  # kg, 500 g, bunch, piece, litre, bag
+    min_order_quantity = Column(Float, nullable=False, default=10.0)  # Default 10 kg minimum order
     stock_quantity = Column(Float, nullable=False, default=0.0)
     farm_location = Column(String(255), nullable=False)
     harvest_date = Column(String(50), nullable=True)

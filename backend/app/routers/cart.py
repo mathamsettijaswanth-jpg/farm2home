@@ -93,6 +93,13 @@ def add_to_cart(
     if prod.stock_quantity <= 0:
         raise HTTPException(status_code=400, detail="This product is currently out of stock.")
 
+    min_qty = getattr(prod, "min_order_quantity", 10.0) or 10.0
+    if data.quantity < min_qty and prod.unit_type.lower() in ["kg", "kgs", "kilogram"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum order for '{prod.name}' is {min_qty} {prod.unit_type}. Please order at least {min_qty} {prod.unit_type}."
+        )
+
     # Check if item is already in cart
     existing = db.query(CartItem).filter(
         CartItem.user_id == current_user.id,
@@ -146,6 +153,13 @@ def update_cart_item(
         db.delete(item)
         db.commit()
         raise HTTPException(status_code=400, detail="Product is no longer available and was removed.")
+
+    min_qty = getattr(prod, "min_order_quantity", 10.0) or 10.0
+    if data.quantity > 0 and data.quantity < min_qty and prod.unit_type.lower() in ["kg", "kgs", "kilogram"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Minimum order for '{prod.name}' is {min_qty} {prod.unit_type}."
+        )
 
     if data.quantity > prod.stock_quantity:
         raise HTTPException(

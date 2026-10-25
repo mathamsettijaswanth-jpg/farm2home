@@ -8,7 +8,7 @@ from app.database import engine, Base
 from app.seed_data import seed_database
 from app.routers import (
     auth, customers, merchants, products,
-    cart, orders, payments, management
+    cart, orders, payments, management, market_prices
 )
 
 
@@ -49,6 +49,7 @@ app.include_router(cart.router)
 app.include_router(orders.router)
 app.include_router(payments.router)
 app.include_router(management.router)
+app.include_router(market_prices.router)
 
 
 @app.get("/")

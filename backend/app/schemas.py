@@ -138,6 +138,7 @@ class ProductBase(BaseModel):
     image_url: Optional[str] = None
     price_per_unit: float = Field(..., gt=0)
     unit_type: str  # kg, 500 g, bunch, piece, litre, bag
+    min_order_quantity: float = Field(10.0, ge=1.0)
     stock_quantity: float = Field(..., ge=0)
     farm_location: str
     harvest_date: Optional[str] = None
@@ -155,6 +156,7 @@ class ProductUpdate(BaseModel):
     image_url: Optional[str] = None
     price_per_unit: Optional[float] = Field(None, gt=0)
     unit_type: Optional[str] = None
+    min_order_quantity: Optional[float] = Field(None, ge=1.0)
     stock_quantity: Optional[float] = Field(None, ge=0)
     farm_location: Optional[str] = None
     harvest_date: Optional[str] = None
