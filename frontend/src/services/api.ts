@@ -3,7 +3,7 @@ import {
   Order, DemoPayment, AdminStats, DeliverySettings
 } from '../types';
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || '/api';
+const API_BASE = (import.meta as any).env?.VITE_API_BASE_URL || '/api';
 
 export const getStoredToken = (): string | null => {
   return localStorage.getItem('farm2home_token');
