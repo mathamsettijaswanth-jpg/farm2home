@@ -5,6 +5,7 @@
   "description": "Farm2Home - Agricultural Marketplace connecting farmers directly with customers",
   "scripts": {
     "build": "cd frontend && npm install && npm run build",
-    "dev": "cd frontend && npm run dev"
+    "dev": "cd frontend && npm run dev",
+    "vercel-build": "cd frontend && npm install && npm run build"
   }
 }
